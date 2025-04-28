@@ -35,13 +35,15 @@ import json
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter  # <- replaced with wandb
 
 import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
+# NEW: import wandb for experiment tracking
+import wandb
 
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
 
@@ -53,23 +55,32 @@ from util import LinearWarmupCosineDecay, loss_fn
 from network import CleanUNet
 
 
-def train(num_gpus, rank, group_name, 
+def train(use_wandb, num_gpus, rank, group_name, 
           exp_path, log, optimization, loss_config):
 
     # setup local experiment path
     if rank == 0:
         print('exp_path:', exp_path)
     
-    # Create tensorboard logger.
-    log_directory = os.path.join(log["directory"], exp_path)
-    if rank == 0:
-        tb = SummaryWriter(os.path.join(log_directory, 'tensorboard'))
+    # WandB initialization (replaces TensorBoard)
+    if rank == 0 and use_wandb == 'true':
+        wandb_run = wandb.init(
+            project=log.get("project", "CleanUNet"),
+            name=exp_path,
+            dir=log.get("directory", "."),
+            config={
+                "optimization": optimization,
+                "loss_config": loss_config,
+            },
+            resume="allow",  # resume if run id matches
+        )
 
     # distributed running initialization
     if num_gpus > 1:
         init_distributed(rank, num_gpus, group_name, **dist_config)
 
     # Get shared ckpt_directory ready
+    log_directory = os.path.join(log["directory"], exp_path)
     ckpt_directory = os.path.join(log_directory, 'checkpoint')
     if rank == 0:
         if not os.path.isdir(ckpt_directory):
@@ -87,6 +98,7 @@ def train(num_gpus, rank, group_name,
     # predefine model
     net = CleanUNet(**network_config).cuda()
     print_size(net)
+    breakpoint()
 
     # apply gradient all reduce
     if num_gpus > 1:
@@ -172,11 +184,13 @@ def train(num_gpus, rank, group_name,
                     n_iter, reduced_loss, loss.item()), flush=True)
                 
                 if rank == 0:
-                    # save to tensorboard
-                    tb.add_scalar("Train/Train-Loss", loss.item(), n_iter)
-                    tb.add_scalar("Train/Train-Reduced-Loss", reduced_loss, n_iter)
-                    tb.add_scalar("Train/Gradient-Norm", grad_norm, n_iter)
-                    tb.add_scalar("Train/learning-rate", optimizer.param_groups[0]["lr"], n_iter)
+                    # save to wandb instead of tensorboard
+                    wandb.log({
+                        "Train/Train-Loss": loss.item(),
+                        "Train/Train-Reduced-Loss": reduced_loss,
+                        "Train/Gradient-Norm": grad_norm,
+                        "Train/learning-rate": optimizer.param_groups[0]["lr"],
+                    }, step=n_iter)
 
             # save checkpoint
             if n_iter > 0 and n_iter % log["iters_per_ckpt"] == 0 and rank == 0:
@@ -190,9 +204,9 @@ def train(num_gpus, rank, group_name,
 
             n_iter += 1
 
-    # After training, close TensorBoard.
+    # Finish WandB run cleanly
     if rank == 0:
-        tb.close()
+        wandb.finish()
 
     return 0
 
@@ -204,6 +218,8 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--rank', type=int, default=0,
                         help='rank of process for distributed')
     parser.add_argument('-g', '--group_name', type=str, default='',
+                        help='name of group for distributed')
+    parser.add_argument('--use_wandb', type=str, default='',
                         help='name of group for distributed')
     args = parser.parse_args()
 
@@ -231,4 +247,4 @@ if __name__ == "__main__":
 
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
-    train(num_gpus, args.rank, args.group_name, **train_config)
+    train(args.use_wandb, num_gpus, args.rank, args.group_name, **train_config)
