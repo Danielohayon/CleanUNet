@@ -2,9 +2,6 @@
     "network_config": {
         "channels_input": 1,
         "channels_output": 1,
-        "channels_H": 32,
-        "max_H": 384,
-        "encoder_n_layers": 7,
         "kernel_size": 4,
         "stride": 2,
         "tsfm_n_layers": 4, 
@@ -13,9 +10,9 @@
         "tsfm_d_inner": 1152
     },
     "train_config": {
-        "exp_path": "DNS-large-full",
+        "exp_path": "DNS-05-full",
         "log":{
-            "directory": "./exps/model_20/",
+            "directory": "./exps/model_05/",
             "ckpt_iter": "max",
             "iters_per_ckpt": 10000,
             "iters_per_valid": 500
@@ -45,7 +42,7 @@
         "sample_rate": 16000
     },
     "gen_config":{
-        "output_directory": "./exps/model_20/"
+        "output_directory": "./exps/model_05/"
     },
     "dist_config": {
         "dist_backend": "nccl",
