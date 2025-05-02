@@ -13,9 +13,9 @@
         "tsfm_d_inner": 2048
     },
     "train_config": {
-        "exp_path": "DNS-large-full",
+        "exp_path": "DNS-100-full",
         "log":{
-            "directory": "./exp",
+            "directory": "./exps/model_100/",
             "ckpt_iter": "max",
             "iters_per_ckpt": 10000,
             "iters_per_valid": 500
@@ -45,7 +45,7 @@
         "sample_rate": 16000
     },
     "gen_config":{
-        "output_directory": "./exp"
+        "output_directory": "./exps/model_100/"
     },
     "dist_config": {
         "dist_backend": "nccl",
