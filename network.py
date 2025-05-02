@@ -81,7 +81,7 @@ class MultiHeadAttention(nn.Module):
         # Combine the last two dimensions to concatenate all the heads together: b x lq x (n*dv)
         q = q.transpose(1, 2).contiguous().view(sz_b, len_q, -1)
         q = self.dropout(self.fc(q))
-        q += residual
+        q = q + residual
 
         q = self.layer_norm(q)
 
@@ -104,7 +104,7 @@ class PositionwiseFeedForward(nn.Module):
 
         x = self.w_2(F.relu(self.w_1(x)))
         x = self.dropout(x)
-        x += residual
+        x = x + residual
 
         x = self.layer_norm(x)
 
@@ -195,7 +195,7 @@ class TransformerEncoder(nn.Module):
 
         for enc_layer in self.layer_stack:
             enc_output, enc_slf_attn = enc_layer(enc_output, slf_attn_mask=src_mask)
-            enc_slf_attn_list += [enc_slf_attn] if return_attns else []
+            enc_slf_attn_list = enc_slf_attn_list + [enc_slf_attn] if return_attns else []
 
         if return_attns:
             return enc_output, enc_slf_attn_list
@@ -348,7 +348,7 @@ class CleanUNet(nn.Module):
         # decoder
         for i, upsampling_block in enumerate(self.decoder):
             skip_i = skip_connections[i]
-            x += skip_i[:, :, :x.shape[-1]]
+            x = x + skip_i[:, :, :x.shape[-1]]
             x = upsampling_block(x)
 
         x = x[:, :, :L] * std
